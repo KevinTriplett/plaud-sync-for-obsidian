@@ -5,6 +5,7 @@ export interface PlaudVaultAdapter {
 	write(path: string, content: string): Promise<void>;
 	create(path: string, content: string): Promise<void>;
 	rename(oldPath: string, newPath: string): Promise<void>;
+	getFrontmatterFileId(path: string): string | null;
 }
 
 export interface BuildFilenameInput {

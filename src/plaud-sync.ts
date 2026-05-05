@@ -158,16 +158,16 @@ export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncS
 		plaudFolderMap.set(file.id, sanitizedFolder);
 	}
 
-	// Scan vault for folder mismatches
+	// Scan vault for folder mismatches using MetadataCache (fast!)
 	const folderMismatchIds = new Set<string>();
 	try {
 		const vaultFiles = await input.vault.listMarkdownFiles(input.settings.syncFolder);
-		console.log(`[plaud-sync] Scanning ${vaultFiles.length} vault files for folder mismatches...`);
+		console.log(`[plaud-sync] Scanning ${vaultFiles.length} vault files for folder mismatches (using MetadataCache)...`);
 		
 		for (const path of vaultFiles) {
 			try {
-				const content = await input.vault.read(path);
-				const fileId = extractFrontmatterFileId(content);
+				// Use MetadataCache instead of reading file content - much faster!
+				const fileId = input.vault.getFrontmatterFileId(path);
 				
 				if (!fileId) continue; // Skip files without file_id
 				
@@ -179,8 +179,8 @@ export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncS
 					console.log(`[plaud-sync] Folder mismatch for ${fileId}: "${currentFolder}" → "${expectedFolder}"`);
 				}
 			} catch (error) {
-				// Skip files that can't be read
-				console.warn(`[plaud-sync] Failed to read file ${path}:`, error);
+				// Skip files that can't be processed
+				console.warn(`[plaud-sync] Failed to process file ${path}:`, error);
 			}
 		}
 		

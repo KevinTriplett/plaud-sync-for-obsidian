@@ -45,6 +45,14 @@ function createMockVault(initialFiles = {}) {
         files.delete(oldPath);
         files.set(newPath, content);
       }
+    },
+    getFrontmatterFileId(path) {
+      // Mock implementation: extract file_id from frontmatter
+      const content = files.get(path);
+      if (!content) return null;
+      
+      const match = content.match(/^---\n[\s\S]*?file_id:\s*"?([^"\n]+)"?[\s\S]*?\n---/);
+      return match ? match[1].trim() : null;
     }
   };
 }

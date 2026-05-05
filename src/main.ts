@@ -443,6 +443,23 @@ export default class PlaudSyncPlugin extends Plugin {
 					const message = error instanceof Error ? error.message : 'Unknown error';
 					throw new Error(`Failed to rename '${oldPath}' to '${newPath}': ${message}`);
 				}
+			},
+			getFrontmatterFileId: (path) => {
+				// Use Obsidian's MetadataCache for fast frontmatter access
+				const file = this.app.vault.getAbstractFileByPath(path);
+				if (!(file instanceof TFile)) {
+					return null;
+				}
+				
+				const cache = this.app.metadataCache.getFileCache(file);
+				const fileId = cache?.frontmatter?.file_id;
+				
+				// Handle both string and quoted string values
+				if (typeof fileId === 'string') {
+					return fileId.trim() || null;
+				}
+				
+				return null;
 			}
 		};
 	}
