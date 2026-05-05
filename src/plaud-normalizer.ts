@@ -22,7 +22,8 @@ function stripMarkup(value: string): string {
 	return value
 		.replace(/<[^>]*>/g, ' ')
 		.replace(/!\[.*?\]\(.*?\)/g, ' ')
-		.replace(/\s+/g, ' ')
+		.replace(/[ \t]+/g, ' ')
+		.replace(/\n\s*\n\s*\n+/g, '\n\n')
 		.trim();
 }
 
