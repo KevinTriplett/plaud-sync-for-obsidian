@@ -2,6 +2,8 @@ import type {PlaudApiClient, PlaudFileSummary, PlaudFiletag} from './plaud-api';
 import type {NormalizedPlaudDetail} from './plaud-normalizer';
 import type {PlaudVaultAdapter, UpsertPlaudNoteResult} from './plaud-vault';
 import {extractFolderFromPath, extractFrontmatterFolder, extractFrontmatterFileId} from './plaud-vault';
+import type {ProgressReporter} from './progress-reporter';
+import {NoOpProgressReporter} from './progress-reporter';
 
 export interface PlaudSyncSettings {
 	syncFolder: string;
@@ -47,6 +49,7 @@ export interface RunPlaudSyncInput {
 		markdown: string;
 		folderName?: string;
 	}) => Promise<UpsertPlaudNoteResult>;
+	progress?: ProgressReporter;
 }
 
 function normalizeTimestampMs(value: unknown): number {
@@ -133,10 +136,14 @@ function sanitizeFolderName(folderName: string): string {
 }
 
 export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncSummary> {
+	const progress = input.progress || new NoOpProgressReporter();
 	const checkpointBefore = normalizeTimestampMs(input.settings.lastSyncAtMs);
+	
+	progress.report(0, 0, 'Fetching file list from Plaud...');
 	const listed = await input.api.listFiles();
 
 	// Fetch filetags (folders) from API
+	progress.report(0, 0, 'Fetching folders from Plaud...');
 	let filetagMap: Map<string, string> = new Map();
 	try {
 		const filetags = await input.api.listFiletags();
@@ -159,6 +166,7 @@ export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncS
 	}
 
 	// Scan vault for folder mismatches using MetadataCache (fast!)
+	progress.report(0, 0, 'Scanning vault for folder mismatches...');
 	const folderMismatchIds = new Set<string>();
 	try {
 		const vaultFiles = await input.vault.listMarkdownFiles(input.settings.syncFolder);
@@ -205,8 +213,14 @@ export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncS
 	let checkpointCandidate = checkpointBefore;
 	const failures: PlaudSyncFailure[] = [];
 
-	for (const summary of selected) {
+	for (let i = 0; i < selected.length; i++) {
+		const summary = selected[i];
+		if (!summary) continue;
+		
 		const fileId = resolveFileId(summary);
+		
+		// Report progress
+		progress.report(i + 1, selected.length, `Processing note ${i + 1}/${selected.length}`);
 
 		try {
 			const detail = await input.api.getFileDetail(fileId);
@@ -272,12 +286,14 @@ export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncS
 	let checkpointAfter = checkpointBefore;
 	// Save checkpoint even if there were failures, as long as we made progress
 	if (checkpointCandidate > checkpointBefore) {
+		progress.report(selected.length, selected.length, 'Saving checkpoint...');
 		await input.saveCheckpoint(checkpointCandidate);
 		checkpointAfter = checkpointCandidate;
 		console.log(`[plaud-sync] Checkpoint advanced from ${new Date(checkpointBefore).toISOString()} to ${new Date(checkpointAfter).toISOString()}`);
 	}
 
-	return {
+	// Report completion
+	const summary = {
 		listed: listed.length,
 		selected: selected.length,
 		created,
@@ -289,4 +305,12 @@ export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncS
 		lastSyncAtMsAfter: checkpointAfter,
 		failures
 	};
+	
+	if (failed > 0) {
+		progress.error(`Sync completed with ${failed} failure${failed === 1 ? '' : 's'}`);
+	} else {
+		progress.complete(`Synced ${created + updated + renamed} note${created + updated + renamed === 1 ? '' : 's'}`);
+	}
+	
+	return summary;
 }

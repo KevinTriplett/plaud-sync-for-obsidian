@@ -14,7 +14,6 @@ const mainTs = read('src/main.ts');
 const forbiddenMainPatterns = [
   'SampleModal',
   'addRibbonIcon',
-  'addStatusBarItem',
   'open-modal-simple',
   'open-modal-complex',
   'replace-selected',

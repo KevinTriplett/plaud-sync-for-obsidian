@@ -12,6 +12,8 @@ import {type PlaudVaultAdapter, upsertPlaudNote} from './plaud-vault';
 import {PlaudApiError, type PlaudApiClient, type PlaudFileDetail} from './plaud-api';
 import {DEFAULT_RETRY_POLICY, sanitizeTelemetryMessage, type RetryTelemetryEvent, withRetry} from './plaud-retry';
 import {hydratePlaudDetailContent} from './plaud-content-hydrator';
+import {ObsidianProgressReporter} from './obsidian-progress-reporter';
+import {NoOpProgressReporter} from './progress-reporter';
 
 function toErrorMessage(error: unknown): string {
 	if (error instanceof Error && error.message.trim().length > 0) {
@@ -55,8 +57,13 @@ function formatSyncSummary(summary: PlaudSyncSummary): string {
 export default class PlaudSyncPlugin extends Plugin {
 	settings: PlaudPluginSettings;
 	private syncRuntime: PlaudSyncRuntime | null = null;
+	private statusBarItem: HTMLElement | null = null;
 
 	async onload(): Promise<void> {
+		// Add status bar item for progress display
+		this.statusBarItem = this.addStatusBarItem();
+		this.statusBarItem.setText('');
+		
 		console.log('[plaud-sync] Plugin loading...');
 		await this.loadSettings();
 		this.syncRuntime = createPlaudSyncRuntime({
@@ -84,6 +91,12 @@ export default class PlaudSyncPlugin extends Plugin {
 				await this.syncRuntime.cancel();
 			}
 			this.syncRuntime = null;
+		}
+		
+		// Clear status bar
+		if (this.statusBarItem) {
+			this.statusBarItem.setText('');
+			this.statusBarItem = null;
 		}
 		
 		console.log('[plaud-sync] Plugin unloaded successfully');
@@ -200,7 +213,7 @@ export default class PlaudSyncPlugin extends Plugin {
 	private async runSync(trigger: SyncTrigger): Promise<void> {
 		console.log(`[plaud-sync] Starting ${trigger} sync...`);
 		try {
-			const summary = await this.executeSyncBatch();
+			const summary = await this.executeSyncBatch(trigger);
 			console.log('[plaud-sync] Sync completed:', {
 				listed: summary.listed,
 				selected: summary.selected,
@@ -225,7 +238,7 @@ export default class PlaudSyncPlugin extends Plugin {
 		}
 	}
 
-	private async executeSyncBatch(): Promise<PlaudSyncSummary> {
+	private async executeSyncBatch(trigger: SyncTrigger): Promise<PlaudSyncSummary> {
 		const token = await getPlaudToken(this.app);
 		if (!token) {
 			throw new Error('Plaud token missing. Configure it in settings before syncing.');
@@ -252,6 +265,11 @@ export default class PlaudSyncPlugin extends Plugin {
 			listFiletags: async () => this.retryApiCall('sync.list_filetags', async () => api.listFiletags())
 		};
 
+		// Create progress reporter for manual syncs only
+		const progress = trigger === 'manual'
+			? new ObsidianProgressReporter('Plaud sync', this.statusBarItem)
+			: new NoOpProgressReporter();
+
 		return runPlaudSync({
 			api: resilientApi,
 			vault: this.createVaultAdapter(),
@@ -268,7 +286,8 @@ export default class PlaudSyncPlugin extends Plugin {
 			},
 			normalizeDetail: normalizePlaudDetail,
 			renderMarkdown: renderPlaudMarkdown,
-			upsertNote: upsertPlaudNote
+			upsertNote: upsertPlaudNote,
+			progress
 		});
 	}
 
