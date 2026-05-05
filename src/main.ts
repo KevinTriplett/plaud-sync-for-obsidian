@@ -469,11 +469,21 @@ export default class PlaudSyncPlugin extends Plugin {
 				}
 				
 				const cache = this.app.metadataCache.getFileCache(file);
-				const fileId = cache?.frontmatter?.file_id;
+				const frontmatter = cache?.frontmatter;
 				
-				// Handle both string and quoted string values
+				// Check file_id first (preferred), then fall back to id
+				// This matches the resolveFileId() logic in plaud-sync.ts
+				const fileId = frontmatter?.file_id;
 				if (typeof fileId === 'string') {
-					return fileId.trim() || null;
+					const trimmed = fileId.trim();
+					if (trimmed) return trimmed;
+				}
+				
+				// Fall back to id if file_id is not present
+				const id = frontmatter?.id;
+				if (typeof id === 'string') {
+					const trimmed = id.trim();
+					if (trimmed) return trimmed;
 				}
 				
 				return null;
