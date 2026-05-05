@@ -20,6 +20,7 @@ export interface PlaudSyncSummary {
 	selected: number;
 	created: number;
 	updated: number;
+	renamed: number;
 	skipped: number;
 	failed: number;
 	lastSyncAtMsBefore: number;
@@ -121,6 +122,7 @@ export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncS
 
 	let created = 0;
 	let updated = 0;
+	let renamed = 0;
 	let skipped = 0;
 	let failed = 0;
 	let checkpointCandidate = checkpointBefore;
@@ -160,6 +162,8 @@ export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncS
 				created += 1;
 			} else if (upsertResult.action === 'updated') {
 				updated += 1;
+			} else if (upsertResult.action === 'renamed') {
+				renamed += 1;
 			} else {
 				skipped += 1;
 			}
@@ -189,6 +193,7 @@ export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncS
 		selected: selected.length,
 		created,
 		updated,
+		renamed,
 		skipped,
 		failed,
 		lastSyncAtMsBefore: checkpointBefore,

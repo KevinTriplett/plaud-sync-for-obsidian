@@ -4,6 +4,7 @@ export interface PlaudVaultAdapter {
 	read(path: string): Promise<string>;
 	write(path: string, content: string): Promise<void>;
 	create(path: string, content: string): Promise<void>;
+	rename(oldPath: string, newPath: string): Promise<void>;
 }
 
 export interface BuildFilenameInput {
@@ -24,8 +25,9 @@ export interface UpsertPlaudNoteInput {
 }
 
 export interface UpsertPlaudNoteResult {
-	action: 'created' | 'updated' | 'skipped';
+	action: 'created' | 'updated' | 'skipped' | 'renamed';
 	path: string;
+	oldPath?: string;
 }
 
 function normalizeFolder(folder: string): string {
@@ -127,6 +129,12 @@ export async function upsertPlaudNote(input: UpsertPlaudNoteInput): Promise<Upse
 	const existingPaths = await input.vault.listMarkdownFiles(folder);
 	const existingSet = new Set(existingPaths);
 
+	const desiredFileName = buildPlaudFilename({
+		filenamePattern: input.filenamePattern,
+		date: input.date,
+		title: input.title
+	});
+
 	for (const path of existingPaths) {
 		const fileId = extractFrontmatterFileId(await input.vault.read(path));
 		if (fileId === input.fileId) {
@@ -134,17 +142,28 @@ export async function upsertPlaudNote(input: UpsertPlaudNoteInput): Promise<Upse
 				return {action: 'skipped', path};
 			}
 
+			// Extract current filename from path
+			const currentFileName = path.split('/').pop() || '';
+			
+			// Check if filename needs to be updated
+			if (currentFileName !== desiredFileName) {
+				// Remove old path from set and add new path
+				existingSet.delete(path);
+				const newPath = resolveAvailablePath(folder, desiredFileName, existingSet);
+				
+				// Rename the file and update content
+				await input.vault.rename(path, newPath);
+				await input.vault.write(newPath, input.markdown);
+				return {action: 'renamed', path: newPath, oldPath: path};
+			}
+
+			// Same filename, just update content
 			await input.vault.write(path, input.markdown);
 			return {action: 'updated', path};
 		}
 	}
 
-	const initialFileName = buildPlaudFilename({
-		filenamePattern: input.filenamePattern,
-		date: input.date,
-		title: input.title
-	});
-	const path = resolveAvailablePath(folder, initialFileName, existingSet);
+	const path = resolveAvailablePath(folder, desiredFileName, existingSet);
 
 	await input.vault.create(path, input.markdown);
 	return {action: 'created', path};

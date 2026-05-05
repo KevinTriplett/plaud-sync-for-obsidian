@@ -44,7 +44,12 @@ function toActionableMessage(error: unknown): string {
 }
 
 function formatSyncSummary(summary: PlaudSyncSummary): string {
-	return `Plaud sync complete. Created ${summary.created}, updated ${summary.updated}, skipped ${summary.skipped}, failed ${summary.failed}.`;
+	const parts = [`Created ${summary.created}`, `updated ${summary.updated}`];
+	if (summary.renamed > 0) {
+		parts.push(`renamed ${summary.renamed}`);
+	}
+	parts.push(`skipped ${summary.skipped}`, `failed ${summary.failed}`);
+	return `Plaud sync complete. ${parts.join(', ')}.`;
 }
 
 export default class PlaudSyncPlugin extends Plugin {
@@ -269,6 +274,9 @@ export default class PlaudSyncPlugin extends Plugin {
 			},
 			create: async (path, content) => {
 				await this.app.vault.create(path, content);
+			},
+			rename: async (oldPath, newPath) => {
+				await this.app.vault.rename(this.requireFile(oldPath), newPath);
 			}
 		};
 	}
