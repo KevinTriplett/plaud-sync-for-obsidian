@@ -323,15 +323,24 @@ export default class PlaudSyncPlugin extends Plugin {
 					return;
 				}
 
-				if (this.app.vault.getAbstractFileByPath(normalized)) {
+				// Check if folder already exists
+				const existing = this.app.vault.getAbstractFileByPath(normalized);
+				if (existing) {
+					// Verify it's actually a folder, not a file
+					if (!(existing instanceof TFolder)) {
+						throw new Error(`Path exists but is not a folder: ${normalized}`);
+					}
 					return;
 				}
 
 				try {
 					await this.app.vault.createFolder(normalized);
-				} catch {
-					if (!this.app.vault.getAbstractFileByPath(normalized)) {
-						throw new Error(`Unable to create Plaud sync folder: ${normalized}`);
+				} catch (error) {
+					// Double-check if folder was created by another process
+					const recheck = this.app.vault.getAbstractFileByPath(normalized);
+					if (!recheck || !(recheck instanceof TFolder)) {
+						const message = error instanceof Error ? error.message : 'Unknown error';
+						throw new Error(`Unable to create folder '${normalized}': ${message}`);
 					}
 				}
 			},
@@ -346,16 +355,79 @@ export default class PlaudSyncPlugin extends Plugin {
 				);
 			},
 			read: async (path) => {
-				return this.app.vault.cachedRead(this.requireFile(path));
+				const file = this.requireFile(path);
+				try {
+					return await this.app.vault.cachedRead(file);
+				} catch (error) {
+					const message = error instanceof Error ? error.message : 'Unknown error';
+					throw new Error(`Failed to read file '${path}': ${message}`);
+				}
 			},
 			write: async (path, content) => {
-				await this.app.vault.modify(this.requireFile(path), content);
+				const file = this.requireFile(path);
+				
+				// Validate content is not empty for safety
+				if (typeof content !== 'string') {
+					throw new Error(`Invalid content type for write operation: ${typeof content}`);
+				}
+				
+				try {
+					await this.app.vault.modify(file, content);
+				} catch (error) {
+					const message = error instanceof Error ? error.message : 'Unknown error';
+					throw new Error(`Failed to write file '${path}': ${message}`);
+				}
 			},
 			create: async (path, content) => {
-				await this.app.vault.create(path, content);
+				// Validate path doesn't already exist
+				const existing = this.app.vault.getAbstractFileByPath(path);
+				if (existing) {
+					throw new Error(`Cannot create file, path already exists: ${path}`);
+				}
+				
+				// Validate content
+				if (typeof content !== 'string') {
+					throw new Error(`Invalid content type for create operation: ${typeof content}`);
+				}
+				
+				// Validate path format
+				if (!path.endsWith('.md')) {
+					throw new Error(`Invalid file path, must end with .md: ${path}`);
+				}
+				
+				try {
+					await this.app.vault.create(path, content);
+				} catch (error) {
+					const message = error instanceof Error ? error.message : 'Unknown error';
+					throw new Error(`Failed to create file '${path}': ${message}`);
+				}
 			},
 			rename: async (oldPath, newPath) => {
-				await this.app.vault.rename(this.requireFile(oldPath), newPath);
+				// Validate source file exists
+				const sourceFile = this.requireFile(oldPath);
+				
+				// Validate target doesn't exist
+				const targetExists = this.app.vault.getAbstractFileByPath(newPath);
+				if (targetExists) {
+					throw new Error(`Cannot rename, target path already exists: ${newPath}`);
+				}
+				
+				// Validate paths are different
+				if (oldPath === newPath) {
+					throw new Error(`Source and target paths are identical: ${oldPath}`);
+				}
+				
+				// Validate new path format
+				if (!newPath.endsWith('.md')) {
+					throw new Error(`Invalid target path, must end with .md: ${newPath}`);
+				}
+				
+				try {
+					await this.app.vault.rename(sourceFile, newPath);
+				} catch (error) {
+					const message = error instanceof Error ? error.message : 'Unknown error';
+					throw new Error(`Failed to rename '${oldPath}' to '${newPath}': ${message}`);
+				}
 			}
 		};
 	}
