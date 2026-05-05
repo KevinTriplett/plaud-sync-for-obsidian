@@ -26,7 +26,7 @@ test('listFiles uses /file/simple/web with requestUrl-compatible call shape', as
   assert.equal(files[0].id, 'f1');
 
   assert.equal(called.method, 'GET');
-  assert.equal(called.url, 'https://api.plaud.ai/file/simple/web');
+  assert.equal(called.url, 'https://api.plaud.ai/file/simple/web?skip=0&limit=99999&is_trash=2&sort_by=start_time&is_desc=true');
   assert.equal(called.headers.Authorization, 'Bearer tok_123');
 });
 

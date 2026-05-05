@@ -12,6 +12,7 @@ function createHost() {
   const commands = [];
   let syncCalls = 0;
   let validateCalls = 0;
+  let deleteFoldersCalls = 0;
 
   return {
     commands,
@@ -21,6 +22,9 @@ function createHost() {
     get validateCalls() {
       return validateCalls;
     },
+    get deleteFoldersCalls() {
+      return deleteFoldersCalls;
+    },
     addCommand(command) {
       commands.push(command);
     },
@@ -29,6 +33,9 @@ function createHost() {
     },
     async validatePlaudToken() {
       validateCalls += 1;
+    },
+    async deleteEmptyFolders() {
+      deleteFoldersCalls += 1;
     }
   };
 }
@@ -38,16 +45,20 @@ test('registerPlaudCommands wires sync-now and validate-token command handlers',
 
   registerPlaudCommands(host);
 
-  assert.equal(host.commands.length, 2);
+  assert.equal(host.commands.length, 3);
   assert.equal(host.commands[0].id, 'sync-now');
-  assert.equal(host.commands[0].name, 'Plaud: sync now');
+  assert.equal(host.commands[0].name, 'Sync now');
   assert.equal(host.commands[1].id, 'validate-token');
-  assert.equal(host.commands[1].name, 'Plaud: validate token');
+  assert.equal(host.commands[1].name, 'Validate token');
+  assert.equal(host.commands[2].id, 'delete-empty-folders');
+  assert.equal(host.commands[2].name, 'Delete empty folders');
 
   host.commands[0].callback();
   host.commands[1].callback();
+  host.commands[2].callback();
   await Promise.resolve();
 
   assert.equal(host.syncCalls, 1);
   assert.equal(host.validateCalls, 1);
+  assert.equal(host.deleteFoldersCalls, 1);
 });

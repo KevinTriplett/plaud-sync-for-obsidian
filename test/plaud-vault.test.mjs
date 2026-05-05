@@ -13,12 +13,14 @@ function createMockVault(initialFiles = {}) {
   const createdFolders = [];
   const writes = [];
   const creates = [];
+  const renames = [];
 
   return {
     files,
     createdFolders,
     writes,
     creates,
+    renames,
     async ensureFolder(path) {
       createdFolders.push(path);
     },
@@ -35,6 +37,14 @@ function createMockVault(initialFiles = {}) {
     async create(path, content) {
       creates.push(path);
       files.set(path, content);
+    },
+    async rename(oldPath, newPath) {
+      renames.push({oldPath, newPath});
+      const content = files.get(oldPath);
+      if (content !== undefined) {
+        files.delete(oldPath);
+        files.set(newPath, content);
+      }
     }
   };
 }
@@ -71,7 +81,7 @@ test('creates sync folder and new note when no existing file_id match', async ()
 
 test('matches existing note by frontmatter file_id and updates in place', async () => {
   const vault = createMockVault({
-    'Plaud/existing.md': '---\nfile_id: f_abc\n---\n\nold'
+    'Plaud/plaud-2024-11-04-updated-title.md': '---\nfile_id: f_abc\n---\n\nold'
   });
 
   const result = await upsertPlaudNote({
@@ -86,14 +96,14 @@ test('matches existing note by frontmatter file_id and updates in place', async 
   });
 
   assert.equal(result.action, 'updated');
-  assert.equal(result.path, 'Plaud/existing.md');
-  assert.deepEqual(vault.writes, ['Plaud/existing.md']);
+  assert.equal(result.path, 'Plaud/plaud-2024-11-04-updated-title.md');
+  assert.deepEqual(vault.writes, ['Plaud/plaud-2024-11-04-updated-title.md']);
   assert.equal(vault.creates.length, 0);
 });
 
 test('matches existing note when frontmatter file_id is quoted', async () => {
   const vault = createMockVault({
-    'Plaud/quoted.md': '---\nfile_id: "f_quoted"\n---\n\nold'
+    'Plaud/plaud-2024-11-04-quoted-match.md': '---\nfile_id: "f_quoted"\n---\n\nold'
   });
 
   const result = await upsertPlaudNote({
@@ -108,8 +118,8 @@ test('matches existing note when frontmatter file_id is quoted', async () => {
   });
 
   assert.equal(result.action, 'updated');
-  assert.equal(result.path, 'Plaud/quoted.md');
-  assert.deepEqual(vault.writes, ['Plaud/quoted.md']);
+  assert.equal(result.path, 'Plaud/plaud-2024-11-04-quoted-match.md');
+  assert.deepEqual(vault.writes, ['Plaud/plaud-2024-11-04-quoted-match.md']);
   assert.equal(vault.creates.length, 0);
 });
 
