@@ -164,4 +164,117 @@ test('applies collision-safe filename fallback for new notes', async () => {
 
   assert.equal(result.action, 'created');
   assert.equal(result.path, 'Plaud/plaud-2024-11-04-first-note-3.md');
+
+test('sanitizes folder names by removing invalid filesystem characters', async () => {
+  const vault = createMockVault();
+
+  const result = await upsertPlaudNote({
+    vault,
+    syncFolder: 'Plaud',
+    filenamePattern: 'plaud-{date}-{title}',
+    updateExisting: true,
+    fileId: 'f_sanitize',
+    title: 'Test Note',
+    date: '2024-11-04',
+    markdown: '---\nfile_id: f_sanitize\n---\n\nContent',
+    folderName: 'Work:Projects/Q4<2024>'
+  });
+
+  assert.equal(result.action, 'created');
+  assert.equal(result.path, 'Plaud/Work-Projects-Q4-2024-/plaud-2024-11-04-test-note.md');
+  // ensureFolder is called for both base and subfolder
+  assert.ok(vault.createdFolders.includes('Plaud/Work-Projects-Q4-2024-'));
+});
+
+test('creates notes in subfolders when folderName is provided', async () => {
+  const vault = createMockVault();
+
+  const result = await upsertPlaudNote({
+    vault,
+    syncFolder: 'Plaud',
+    filenamePattern: 'plaud-{date}-{title}',
+    updateExisting: true,
+    fileId: 'f_folder',
+    title: 'Meeting Notes',
+    date: '2024-11-04',
+    markdown: '---\nfile_id: f_folder\n---\n\nContent',
+    folderName: 'Work Meetings'
+  });
+
+  assert.equal(result.action, 'created');
+  assert.equal(result.path, 'Plaud/Work Meetings/plaud-2024-11-04-meeting-notes.md');
+  // ensureFolder is called for both base and subfolder
+  assert.ok(vault.createdFolders.includes('Plaud/Work Meetings'));
+});
+
+test('moves existing note to correct folder when folder changes', async () => {
+  const vault = createMockVault({
+    'Plaud/Old Folder/plaud-2024-11-04-moved-note.md': '---\nfile_id: f_move\n---\n\nold'
+  });
+
+  const result = await upsertPlaudNote({
+    vault,
+    syncFolder: 'Plaud',
+    filenamePattern: 'plaud-{date}-{title}',
+    updateExisting: true,
+    fileId: 'f_move',
+    title: 'Moved Note',
+    date: '2024-11-04',
+    markdown: '---\nfile_id: f_move\n---\n\nnew',
+    folderName: 'New Folder'
+  });
+
+  assert.equal(result.action, 'renamed');
+  assert.equal(result.path, 'Plaud/New Folder/plaud-2024-11-04-moved-note.md');
+  assert.equal(result.oldPath, 'Plaud/Old Folder/plaud-2024-11-04-moved-note.md');
+  assert.deepEqual(vault.renames, [{
+    oldPath: 'Plaud/Old Folder/plaud-2024-11-04-moved-note.md',
+    newPath: 'Plaud/New Folder/plaud-2024-11-04-moved-note.md'
+  }]);
+});
+
+test('renames file when title changes but folder stays same', async () => {
+  const vault = createMockVault({
+    'Plaud/Meetings/plaud-2024-11-04-old-title.md': '---\nfile_id: f_rename\n---\n\nold'
+  });
+
+  const result = await upsertPlaudNote({
+    vault,
+    syncFolder: 'Plaud',
+    filenamePattern: 'plaud-{date}-{title}',
+    updateExisting: true,
+    fileId: 'f_rename',
+    title: 'New Title',
+    date: '2024-11-04',
+    markdown: '---\nfile_id: f_rename\n---\n\nnew',
+    folderName: 'Meetings'
+  });
+
+  assert.equal(result.action, 'renamed');
+  assert.equal(result.path, 'Plaud/Meetings/plaud-2024-11-04-new-title.md');
+  assert.equal(result.oldPath, 'Plaud/Meetings/plaud-2024-11-04-old-title.md');
+});
+
+test('updates in place when folder and filename match', async () => {
+  const vault = createMockVault({
+    'Plaud/Projects/plaud-2024-11-04-same-note.md': '---\nfile_id: f_same\n---\n\nold'
+  });
+
+  const result = await upsertPlaudNote({
+    vault,
+    syncFolder: 'Plaud',
+    filenamePattern: 'plaud-{date}-{title}',
+    updateExisting: true,
+    fileId: 'f_same',
+    title: 'Same Note',
+    date: '2024-11-04',
+    markdown: '---\nfile_id: f_same\n---\n\nnew',
+    folderName: 'Projects'
+  });
+
+  assert.equal(result.action, 'updated');
+  assert.equal(result.path, 'Plaud/Projects/plaud-2024-11-04-same-note.md');
+  assert.equal(vault.renames.length, 0);
+  assert.deepEqual(vault.writes, ['Plaud/Projects/plaud-2024-11-04-same-note.md']);
+});
 });

@@ -82,4 +82,28 @@ test('escapes quotes in title frontmatter while preserving heading text', () => 
 
   assert.match(markdown, /^title: "Exec \\"Q4\\" Sync"$/m);
   assert.match(markdown, /^# Exec "Q4" Sync$/m);
+
+test('includes plaud_folder in frontmatter when folderName is provided', () => {
+  const markdown = renderPlaudMarkdown(sampleDetail, 'Work Meetings');
+
+  assert.match(markdown, /^plaud_folder: "Work Meetings"$/m);
+});
+
+test('omits plaud_folder from frontmatter when folderName is not provided', () => {
+  const markdown = renderPlaudMarkdown(sampleDetail);
+
+  assert.doesNotMatch(markdown, /plaud_folder:/);
+});
+
+test('omits plaud_folder from frontmatter when folderName is empty string', () => {
+  const markdown = renderPlaudMarkdown(sampleDetail, '');
+
+  assert.doesNotMatch(markdown, /plaud_folder:/);
+});
+
+test('escapes quotes in folder name frontmatter', () => {
+  const markdown = renderPlaudMarkdown(sampleDetail, 'Q4 "Planning" Folder');
+
+  assert.match(markdown, /^plaud_folder: "Q4 \\"Planning\\" Folder"$/m);
+});
 });

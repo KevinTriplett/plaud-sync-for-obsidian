@@ -184,4 +184,54 @@ test('normalizes configured token that already includes bearer prefix', async ()
 
   await client.listFiles();
   assert.equal(called.headers.Authorization, 'Bearer tok_prefixed');
+
+test('listFiletags uses /filetag/ endpoint', async () => {
+  let called = null;
+  const client = createPlaudApiClient({
+    apiDomain: 'https://api.plaud.ai',
+    token: 'tok_123',
+    request: async (req) => {
+      called = req;
+      return {
+        status: 200,
+        json: {
+          status: 0,
+          msg: 'ok',
+          payload: [
+            {id: 'tag_1', name: 'Work', icon: '💼', color: '#FF0000'},
+            {id: 'tag_2', name: 'Personal', icon: '🏠', color: '#00FF00'}
+          ]
+        }
+      };
+    }
+  });
+
+  const filetags = await client.listFiletags();
+  
+  assert.equal(filetags.length, 2);
+  assert.equal(filetags[0].id, 'tag_1');
+  assert.equal(filetags[0].name, 'Work');
+  assert.equal(filetags[0].icon, '💼');
+  assert.equal(filetags[0].color, '#FF0000');
+  assert.equal(filetags[1].id, 'tag_2');
+  assert.equal(filetags[1].name, 'Personal');
+  
+  assert.equal(called.method, 'GET');
+  assert.equal(called.url, 'https://api.plaud.ai/filetag/');
+  assert.equal(called.headers.Authorization, 'Bearer tok_123');
+});
+
+test('listFiletags handles empty filetag list', async () => {
+  const client = createPlaudApiClient({
+    apiDomain: 'https://api.plaud.ai',
+    token: 'tok_123',
+    request: async () => ({
+      status: 200,
+      json: {status: 0, msg: 'ok', payload: []}
+    })
+  });
+
+  const filetags = await client.listFiletags();
+  assert.equal(filetags.length, 0);
+});
 });

@@ -136,4 +136,39 @@ test('gracefully handles malformed payloads', () => {
   assert.equal(normalized.summary, '');
   assert.deepEqual(normalized.highlights, []);
   assert.equal(normalized.transcript, '');
+
+test('extracts filetagId from filetag_id_list array', () => {
+  const normalized = normalizePlaudDetail({
+    id: 'tag-1',
+    filetag_id_list: ['folder_123', 'folder_456']
+  });
+
+  assert.equal(normalized.filetagId, 'folder_123');
+});
+
+test('returns empty string when filetag_id_list is empty', () => {
+  const normalized = normalizePlaudDetail({
+    id: 'tag-2',
+    filetag_id_list: []
+  });
+
+  assert.equal(normalized.filetagId, '');
+});
+
+test('returns empty string when filetag_id_list is missing', () => {
+  const normalized = normalizePlaudDetail({
+    id: 'tag-3'
+  });
+
+  assert.equal(normalized.filetagId, '');
+});
+
+test('handles non-array filetag_id_list gracefully', () => {
+  const normalized = normalizePlaudDetail({
+    id: 'tag-4',
+    filetag_id_list: 'not-an-array'
+  });
+
+  assert.equal(normalized.filetagId, '');
+});
 });
