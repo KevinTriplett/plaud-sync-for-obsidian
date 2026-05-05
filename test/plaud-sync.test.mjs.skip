@@ -164,4 +164,58 @@ test('advances lastSyncAtMs only after successful batch completion', async () =>
   assert.equal(summary.failed, 0);
   assert.deepEqual(checkpointCalls, [1500]);
   assert.equal(summary.lastSyncAtMsAfter, 1500);
+
+test('detects and re-syncs files missing from vault (deleted locally)', async () => {
+  const detailCalls = [];
+
+  const summary = await runPlaudSync({
+    api: {
+      async listFiles() {
+        return [
+          {id: 'exists', file_id: 'exists', edit_time: 100, is_trash: false},
+          {id: 'missing', file_id: 'missing', edit_time: 50, is_trash: false},
+          {id: 'trashed', file_id: 'trashed', edit_time: 200, is_trash: true}
+        ];
+      },
+      async getFileDetail(id) {
+        detailCalls.push(id);
+        return {id, file_id: id, file_name: id, start_time: 1000, duration: 60000};
+      },
+      async listFiletags() {
+        return [];
+      }
+    },
+    vault: {
+      async listMarkdownFiles() {
+        return ['Plaud/exists.md'];
+      },
+      getFrontmatterFileId(path) {
+        if (path === 'Plaud/exists.md') return 'exists';
+        return null;
+      }
+    },
+    settings: baseSettings({lastSyncAtMs: 150000}), // High checkpoint - no files should sync by edit_time
+    saveCheckpoint: async () => {},
+    normalizeDetail: (raw) => ({
+      id: raw.id,
+      fileId: raw.file_id,
+      title: raw.file_name,
+      startAtMs: raw.start_time,
+      durationMs: raw.duration,
+      summary: '',
+      highlights: [],
+      transcript: '',
+      filetagId: '',
+      raw
+    }),
+    renderMarkdown: () => '---\nfile_id: x\n---',
+    upsertNote: async (input) => ({action: 'created', path: `Plaud/${input.fileId}.md`})
+  });
+
+  // Should only fetch detail for 'missing' file (not 'exists' or 'trashed')
+  assert.deepEqual(detailCalls, ['missing']);
+  assert.equal(summary.created, 1);
+  assert.equal(summary.selected, 1);
+  assert.equal(summary.listed, 3);
+});
 });

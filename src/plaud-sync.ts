@@ -165,12 +165,13 @@ export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncS
 		plaudFolderMap.set(file.id, sanitizedFolder);
 	}
 
-	// Scan vault for folder mismatches using MetadataCache (fast!)
-	progress.report(0, 0, 'Scanning vault for folder mismatches...');
+	// Scan vault for folder mismatches and build set of existing file IDs
+	progress.report(0, 0, 'Scanning vault for changes...');
 	const folderMismatchIds = new Set<string>();
+	const existingFileIds = new Set<string>();
 	try {
 		const vaultFiles = await input.vault.listMarkdownFiles(input.settings.syncFolder);
-		console.log(`[plaud-sync] Scanning ${vaultFiles.length} vault files for folder mismatches (using MetadataCache)...`);
+		console.log(`[plaud-sync] Scanning ${vaultFiles.length} vault files (using MetadataCache)...`);
 		
 		for (const path of vaultFiles) {
 			try {
@@ -178,6 +179,9 @@ export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncS
 				const fileId = input.vault.getFrontmatterFileId(path);
 				
 				if (!fileId) continue; // Skip files without file_id
+				
+				// Track that this file exists in vault
+				existingFileIds.add(fileId);
 				
 				const currentFolder = extractFolderFromPath(path, input.settings.syncFolder);
 				const expectedFolder = plaudFolderMap.get(fileId);
@@ -192,18 +196,36 @@ export async function runPlaudSync(input: RunPlaudSyncInput): Promise<PlaudSyncS
 			}
 		}
 		
-		console.log(`[plaud-sync] Found ${folderMismatchIds.size} files with folder mismatches`);
+		console.log(`[plaud-sync] Found ${existingFileIds.size} existing files, ${folderMismatchIds.size} with folder mismatches`);
 	} catch (error) {
-		console.warn('[plaud-sync] Failed to scan vault for folder mismatches:', error);
+		console.warn('[plaud-sync] Failed to scan vault:', error);
 	}
 
-	// Combine incremental sync with folder mismatch detection
+	// Detect missing files (exist in Plaud but not in vault)
+	const missingFileIds = new Set<string>();
+	for (const file of listed) {
+		if (isTrashedFile(file)) continue; // Skip trashed files
+		
+		const fileId = resolveFileId(file);
+		if (!existingFileIds.has(fileId)) {
+			missingFileIds.add(fileId);
+		}
+	}
+	
+	if (missingFileIds.size > 0) {
+		console.log(`[plaud-sync] Found ${missingFileIds.size} files missing from vault (deleted locally)`);
+	}
+
+	// Combine incremental sync with folder mismatch detection and missing file detection
 	const selected = listed.filter((summary) => {
 		const fileId = resolveFileId(summary);
-		return shouldSyncFile(summary, checkpointBefore) || folderMismatchIds.has(fileId);
+		return shouldSyncFile(summary, checkpointBefore)
+			|| folderMismatchIds.has(fileId)
+			|| missingFileIds.has(fileId);
 	});
 
-	console.log(`[plaud-sync] Selected ${selected.length} files to sync (${selected.length - folderMismatchIds.size} by edit_time, ${folderMismatchIds.size} by folder mismatch)`);
+	const byEditTime = selected.length - folderMismatchIds.size - missingFileIds.size;
+	console.log(`[plaud-sync] Selected ${selected.length} files to sync (${byEditTime} by edit_time, ${folderMismatchIds.size} by folder mismatch, ${missingFileIds.size} missing from vault)`);
 
 	let created = 0;
 	let updated = 0;
