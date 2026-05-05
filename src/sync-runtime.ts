@@ -11,12 +11,19 @@ const LOCKED_MESSAGE = 'Plaud sync already running. Please wait for current run 
 export interface PlaudSyncRuntime {
 	runManualSync(): Promise<boolean>;
 	runStartupSync(): Promise<boolean>;
+	cancel(): Promise<void>;
+	isRunning(): boolean;
 }
 
 export function createPlaudSyncRuntime(options: PlaudSyncRuntimeOptions): PlaudSyncRuntime {
 	let inFlight: Promise<void> | null = null;
+	let cancelled = false;
 
 	const runWithLock = async (trigger: SyncTrigger): Promise<boolean> => {
+		if (cancelled) {
+			return false;
+		}
+
 		if (inFlight) {
 			options.onLocked(LOCKED_MESSAGE);
 			return false;
@@ -43,6 +50,19 @@ export function createPlaudSyncRuntime(options: PlaudSyncRuntimeOptions): PlaudS
 			}
 
 			return runWithLock('startup');
-		}
+		},
+		cancel: async () => {
+			cancelled = true;
+			// Wait for any in-flight sync to complete
+			if (inFlight) {
+				try {
+					await inFlight;
+				} catch {
+					// Ignore errors during cancellation
+				}
+			}
+			inFlight = null;
+		},
+		isRunning: () => inFlight !== null
 	};
 }

@@ -74,6 +74,21 @@ export default class PlaudSyncPlugin extends Plugin {
 		void this.syncRuntime.runStartupSync();
 	}
 
+	async onunload(): Promise<void> {
+		console.log('[plaud-sync] Plugin unloading...');
+		
+		// Cancel any in-flight sync operations
+		if (this.syncRuntime) {
+			if (this.syncRuntime.isRunning()) {
+				console.log('[plaud-sync] Waiting for sync to complete...');
+				await this.syncRuntime.cancel();
+			}
+			this.syncRuntime = null;
+		}
+		
+		console.log('[plaud-sync] Plugin unloaded successfully');
+	}
+
 	async loadSettings(): Promise<void> {
 		this.settings = normalizeSettings(await this.loadData());
 	}
