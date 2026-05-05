@@ -80,7 +80,7 @@ Open **Settings → Community plugins → Plaud Sync**:
 | Filename pattern | `plaud-{date}-{title}` | Pattern for new note filenames (`{date}` and `{title}` are replaced) |
 | Sync on startup | `true` | Automatically sync when Obsidian starts |
 | Update existing notes | `true` | Overwrite notes that already exist (matched by `file_id`); also enables filename and folder synchronization |
-| Exclude notes without transcription | `false` | Skip recordings that haven't been transcribed yet |
+| Exclude notes without transcription | `false` | Skip recordings that haven't been transcribed yet (see [Performance note](#performance-note-exclude-without-transcription)) |
 
 ## Usage
 
@@ -106,6 +106,20 @@ Open the command palette (`Ctrl/Cmd+P`) and search for:
 **Efficiency:** Only processes recordings that actually changed. Folder change detection adds ~3 seconds overhead for 1000+ recordings.
 
 If sync is already running (startup or manual), additional attempts are blocked until the current run finishes.
+
+#### Performance note: Exclude without transcription
+
+When "Exclude notes without transcription" is enabled, the plugin must check every recording in your Plaud account during each sync to detect:
+1. Recordings that were deleted locally and need to be re-synced
+2. Recordings that now have transcripts (previously skipped)
+
+This means if you have 1000 recordings and only 300 have transcripts, the plugin will fetch details for all 1000 recordings during sync, then skip the 700 without transcripts. This is an acceptable trade-off because:
+- Sync only happens at startup or when manually triggered (not frequently)
+- Batch processing with concurrency 5 makes this fast (~2-3 minutes for 1000 recordings)
+- It ensures deleted notes are re-synced and new transcripts are detected
+- Skipped recordings don't write to the vault, so there's no disk overhead
+
+If you have many recordings without transcripts and want faster syncs, consider disabling this setting and manually deleting notes you don't want.
 
 ## Troubleshooting
 
