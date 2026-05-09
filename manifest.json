@@ -1,10 +1,10 @@
 {
 	"id": "plaud-sync",
 	"name": "Plaud Sync",
-	"version": "1.0.0",
+	"version": "0.1.0",
 	"minAppVersion": "0.15.0",
 	"description": "Sync Plaud voice recordings into Markdown notes with transcripts, AI summaries, and highlights.",
-	"author": "Leonard Sellem",
-	"authorUrl": "https://github.com/leonardsellem",
+	"author": "Kevin Triplett",
+	"authorUrl": "https://github.com/KevinTriplett",
 	"isDesktopOnly": false
 }
