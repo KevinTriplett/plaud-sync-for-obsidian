@@ -67,6 +67,36 @@ test('buildPlaudFilename is deterministic and slug-safe', () => {
   assert.equal(filename, 'plaud-2024-11-04-weekly-sync-team-product.md');
 });
 
+test('buildPlaudFilename substitutes {year} from date prefix', () => {
+  const filename = buildPlaudFilename({
+    filenamePattern: '{year}/plaud-{date}-{title}',
+    date: '2024-11-04',
+    title: 'Weekly Sync'
+  });
+
+  assert.equal(filename, '2024-plaud-2024-11-04-weekly-sync.md');
+});
+
+test('buildPlaudFilename supports {year} alone without {date}', () => {
+  const filename = buildPlaudFilename({
+    filenamePattern: '{year}-{title}',
+    date: '2024-11-04',
+    title: 'Annual Review'
+  });
+
+  assert.equal(filename, '2024-annual-review.md');
+});
+
+test('buildPlaudFilename {year} falls back gracefully for malformed dates', () => {
+  const filename = buildPlaudFilename({
+    filenamePattern: '{year}-{title}',
+    date: 'not-a-date',
+    title: 'Test'
+  });
+
+  assert.equal(filename, 'not-a-date-test.md');
+});
+
 test('creates sync folder and new note when no existing file_id match', async () => {
   const vault = createMockVault();
 

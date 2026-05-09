@@ -159,9 +159,15 @@ function withCollisionSuffix(fileName: string, suffix: number): string {
 	return `${base}-${suffix}${ext}`;
 }
 
+function extractYear(date: string): string {
+	const match = date.match(/^(\d{4})/);
+	return match?.[1] ?? date;
+}
+
 export function buildPlaudFilename(input: BuildFilenameInput): string {
 	const pattern = input.filenamePattern.trim() || 'plaud-{date}-{title}';
-	const replacedDate = pattern.replace(/\{date\}/g, input.date);
+	const replacedYear = pattern.replace(/\{year\}/g, extractYear(input.date));
+	const replacedDate = replacedYear.replace(/\{date\}/g, input.date);
 	const filled = replacedDate.replace(/\{title\}/g, slugify(input.title));
 	const filename = slugify(filled).replace(/^-+|-+$/g, '');
 	return `${filename || 'plaud-recording'}.md`;

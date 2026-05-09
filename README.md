@@ -77,7 +77,7 @@ Open **Settings → Community plugins → Plaud Sync**:
 | Plaud token | — | Your session token (stored securely, not in plugin settings) |
 | API domain | `https://api.plaud.ai` | API endpoint; change only if your account is in a different region |
 | Sync folder | `Plaud` | Vault folder where notes are created (subfolders created automatically for Plaud folders) |
-| Filename pattern | `plaud-{date}-{title}` | Pattern for new note filenames (`{date}` and `{title}` are replaced) |
+| Filename pattern | `plaud-{date}-{title}` | Pattern for new note filenames. Supported placeholders: `{year}` (e.g. `2024`), `{date}` (e.g. `2024-11-04`), and `{title}`. |
 | Sync on startup | `true` | Automatically sync when Obsidian starts |
 | Update existing notes | `true` | Overwrite notes that already exist (matched by `file_id`); also enables filename and folder synchronization |
 | Exclude notes without transcription | `false` | Skip recordings that haven't been transcribed yet (see [Performance note](#performance-note-exclude-without-transcription)) |
